@@ -1,0 +1,2 @@
+The docs in this folder were written during the build. The README is the current, authoritative description of the shipped EFI.
+GRAPHICS-ANALYSIS.md and TROUBLESHOOTING.md mention profiles A to E; those profiles now live in experimental/. The shipped profile is the NVIDIA-only dual display one.

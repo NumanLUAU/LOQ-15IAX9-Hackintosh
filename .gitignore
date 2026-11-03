@@ -1,0 +1,27 @@
+# Ignore everything at the top level, then allow only what belongs in the repo
+/*
+!/.gitignore
+!/README.md
+!/EFI/
+!/acpi_src/
+!/acpi_out/
+!/source/
+!/refs/
+!/tools/
+!/profiles/
+!/experimental/
+!/docs/
+
+# Private: my generated SMBIOS, and the private copy of EFI that has it filled in
+# (EFI/ and profiles/ in git have blank SMBIOS values; tools/sync_private.py builds EFI-private/)
+/EFI-private/
+private_smbios.json
+/diagnostics/
+/boot thing/
+/backups/
+
+# Misc
+__pycache__/
+*.pyc
+._*
+.DS_Store
