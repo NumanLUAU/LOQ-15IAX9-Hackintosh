@@ -28,18 +28,18 @@ Everything below was measured on my machine. The hardware inventory and the orig
 | Feature | Status |
 |---|---|
 | Boot to macOS through OpenCore (from USB) | Works |
-| NVIDIA Metal acceleration (driven by NullMoth) | Works, seen on the HDMI monitor |
-| Internal panel on the NVIDIA GPU (BIOS dGPU-only mode) | Not recognized so far, being investigated. In Hybrid mode the internal panel only shows the firmware framebuffer |
-| Brightness control | Enabled (`nvrmacpibl=1`), not confirmed on the internal panel |
+| NVIDIA Metal acceleration (driven by NullMoth) | Works |
+| Internal panel on the NVIDIA GPU | Works in BIOS dGPU-only mode (this laptop has a MUX switch). In Hybrid mode the internal panel is not recognized and only shows the firmware framebuffer |
+| Brightness control | Works (`nvrmacpibl=1`) |
 | HDMI external display on the NVIDIA GPU | Works (tested in Hybrid mode) |
-| Internal panel and HDMI together on the NVIDIA GPU | Not working yet (depends on the internal panel being recognized) |
+| Internal panel and HDMI together on the NVIDIA GPU (dual display) | Works in BIOS dGPU-only mode, both displays register on the NVIDIA GPU |
 | Keyboard, mouse, USB ports, Thunderbolt/USB-C | Works |
 | Audio output and microphone | Works |
 | Wi-Fi (native, no HeliPort) | Works |
 | Touchpad | Works (needed a VoodooI2C match fix, see below) |
 | Android USB tethering (HoRNDIS) | Works |
-| Bluetooth | Not working yet |
-| Sleep (S3) | Not supported with the NullMoth driver (black screen on wake) |
+| Bluetooth | Works (needed the two NVRAM keys, see below). AirPlay works |
+| Sleep and hibernation | Not supported with the NullMoth driver (black screen on wake). See "Sleep and hibernation" below to switch them off |
 | Intel iGPU | Disabled on purpose |
 
 ## BIOS settings (F2)
@@ -155,6 +155,7 @@ The RTX 2050 (25ED) is in NullMoth's device table, but their validation list doe
 | Theme | GoldenGate, plus Apple15.icns and Apple.icns and Windows11.icns (renamed Windows.icns) from the chris1111 Flavours-AppleSet theme | GoldenGate has no Apple logo and its Windows icon is a Boot Camp style disk. The three icons come from the same set so the macOS and Windows entries match |
 | DeviceProperties | `Pci(0x2,0x0)` class-code FFFFFFFF | Hides the Intel iGPU from macOS (see below) |
 | DeviceProperties | `Pci(0x1f,0x3)` layout-id 99; `Pci(0x15,0x0)` force-polling | Audio and touchpad |
+| NVRAM | `bluetoothExternalDongleFailed` = 00 and `bluetoothInternalControllerInfo` = 14 zero bytes, both also in NVRAM > Delete | For Intel Bluetooth on Monterey and later: without them macOS remembers a failed controller and switches Bluetooth off a few seconds after it is enabled. Rewritten at every boot. Same keys the pranish-dev EFI uses. This fixed my Bluetooth |
 
 ## Both displays on the NVIDIA GPU, iGPU disabled
 
@@ -269,6 +270,22 @@ SysReport (ACPI, SMBIOS dumps) is off. It contains the real machine SMBIOS, so n
 
 Generate your own with corpnewt/GenSMBIOS for MacBookPro16,2 and put the serial, board serial, UUID and ROM into your `config.plist`. Mine are unique to my build and are not in this repo. Never share your plist or logs. Apple's coverage page (checkcoverage.apple.com) is the way to check the serial is not a real registered Mac. It needs a CAPTCHA, so do that by hand.
 
+## Sleep and hibernation
+
+The NullMoth driver cannot wake the GPU after sleep, so I switch sleep and hibernation off in macOS. OpenCore already has `Misc > Boot > HibernateMode` = None.
+
+```bash
+sudo pmset -a hibernatemode 0
+sudo pmset -a standby 0
+sudo pmset -a autopoweroff 0
+sudo pmset -a powernap 0
+sudo pmset -a disablesleep 1          # no system sleep at all (closing the lid will not sleep either)
+sudo rm -f /var/vm/sleepimage         # optional, frees the RAM-sized hibernation file
+pmset -g | grep -E "hibernatemode|standby|autopoweroff|SleepDisabled"
+```
+
+To undo: `sudo pmset -a disablesleep 0 hibernatemode 3 standby 1 autopoweroff 1`. For Windows hibernation (and Fast Startup) run `powercfg /h off` in an administrator prompt.
+
 ## Hybrid mode alternative: NMIntelFB (not run yet)
 
 If I stay in Hybrid mode (no BIOS change) the internal panel is on the Intel iGPU, which macOS cannot drive. There is a route that keeps the panel on the iGPU while the NVIDIA GPU does all the rendering: NullMoth's NMIntelFB framebuffer, patched and built with nmx-intel (kitsuneislife/nmx-intel), on NullMoth driver 2.3.6 (newer releases blink on that route). I adapted a working Tiger Lake write-up for my machine. From the sources, my iGPU (8086:468B) is in NMIntelFB's accepted list and my RTX 2050 is in the 2.3.6 installer's table, but I have not run it. The guide is `docs/HYBRID-NMINTELFB.md`, the config is `profiles/config-hybrid-NMIntelFB.plist` (the opposite iGPU handling to the shipped profile: no iGPU hiding, no IONDRVSupport block), and the build and install helpers are in `tools/macos/`.
@@ -278,8 +295,7 @@ Costs: one display only, no sleep, about 45 seconds extra per boot, and I stay o
 ## Not verified yet
 
 * The Windows entry device path (computed from my partition table) and whether Windows keeps the Lenovo identity when launched through OpenCore.
-* Both displays on the NVIDIA GPU at the same time in dGPU-only mode.
-* Bluetooth, sleep.
+* Sleep and hibernation (not supported by the driver).
 
 ## Credits and sources
 
