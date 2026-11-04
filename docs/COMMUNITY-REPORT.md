@@ -16,7 +16,7 @@
 - Hyper-Threading: Off, Secure Boot: Off, CSM: Off, VT-d: Off (or on with `DisableIoMapper`)
 
 **Result**
-Full Metal acceleration on the RTX 2050. In dGPU-only mode the built-in panel (1920x1080, 144 Hz) and the HDMI monitor both register on the NVIDIA GPU, so dual display works. In Hybrid mode the built-in panel is wired to the Intel iGPU, macOS does not recognize it, and only the HDMI port works on the NVIDIA GPU.
+Full Metal acceleration on RTX 2050. In dGPU mode, the built-in panel (1920x1080, 144 Hz) and the HDMI monitor both register on the NVIDIA GPU, so dual display works. In Hybrid mode the built-in panel is wired to the Intel iGPU, macOS does not recognize it, and only the HDMI port works on the NVIDIA GPU.
 
 **What works (Tahoe)**
 - Built-in display and HDMI display at the same time, both on the NVIDIA GPU
@@ -31,25 +31,24 @@ Full Metal acceleration on the RTX 2050. In dGPU-only mode the built-in panel (1
 - macOS OTA updates (iBridged)
 
 **What does not work**
-- Deep sleep (S3) and hibernation. I run `pmset` with hibernation off. Normal sleep works on NullMoth 2.7.1 (older versions gave a black screen on wake).
+- Deep sleep (S3) and hibernation.
 - WhateverXe together with NullMoth: the boot stuck waiting for the HID driver, so I removed it.
 
 **Tahoe specific notes**
-- Audio: Tahoe has no AppleHDA. Adding laobamac's SimpleHDA 1.0.0 after AppleALC (order Lilu, AppleALC, SimpleHDA) with `keepsyms=1` brought it back. VoodooHDA on Tahoe has to be built and installed on the Mac, so I did not use it. NullMoth 2.7 also ships its own HD Audio driver for Tahoe; I have not switched to it.
-- Wi-Fi: AirportItlwm-Tahoe 1.0.0 (kgp-macPro) needs OCLP-CustoMac root patches and gave me no interface and no MAC address. laobamac's itlwm v2.4.0-alpha Tahoe build works with no root patches. Keep it limited to Darwin 25.x.
-- Bluetooth: on Tahoe `-ibtcompatbeta` is needed on top of IntelBluetoothFirmware, IntelBTPatcher 2.5.0 and BlueToolFixup 2.7.3.
-- Updating from Sequoia: iBridged 1.0.1 (Lilu plugin) fixes the OTA process, and RestrictEvents RELEASE 1.1.6 with `revpatch=sbvmm` was used.
+- Audio: Tahoe has no AppleHDA. Adding laobamac's SimpleHDA 1.0.0 after AppleALC (order Lilu, AppleALC, SimpleHDA) with `keepsyms=1` brought it back.
+- Wi-Fi: laobamac's itlwm v2.4.0-alpha Tahoe build works with no root patches. Keep it limited to Darwin 25.x.
+- Bluetooth:`-ibtcompatbeta` is needed on top of IntelBluetoothFirmware, IntelBTPatcher 2.5.0 and BlueToolFixup 2.7.3.
+- iBridged 1.0.1 (Lilu plugin) fixes the OTA process, and RestrictEvents with `revpatch=sbvmm` was used.
 
 **Notes for other Alder Lake (12th gen) laptop owners**
 - CPUID spoof to Comet Lake (`Cpuid1Data` 55 06 0A 00, mask FF FF FF FF), `ProvideCurrentCpuInfo`, `CpuTscSync`, Hyper-Threading off in BIOS.
 - Page fault at `0xFF04504C` right after the hand-off to the kernel: add a `MmioWhitelist` entry for `0xFF000000` (needed with `DevirtualiseMmio`).
-- If the screen shows `DSDT table load failed` and everything stops, the old ACPI interpreter in macOS is choking on a conditionally defined USB port scope. I fixed it with a same-length ACPI patch on the DSDT instead of a replacement DSDT.
+- If screen shows `DSDT table load failed` and freezes, the old ACPI interpreter in macOS is choking on a conditionally defined USB port scope. fixed it with same-length ACPI patch on the DSDT instead of a replacement DSDT.
 - If boot hangs after AppleCredentialManager, the DSDT may declare CPUs only as `Device()` objects. An SSDT that adds `Processor()` objects (SSDT-PLUG-ALT style) fixed it.
 - Touchpad: official VoodooI2C 2.9.1 does not match the Alder Lake-S I2C controller `8086:7acc`. Adding `0x7acc8086&0xFFFCFFFF` to the `IOPCIMatch` of the `VoodooI2CPCILakeController` personality fixed it (polling mode, `-vi2c-force-polling`).
-- Bluetooth: it appeared in System Settings but turned itself off a few seconds after enabling. Adding `bluetoothExternalDongleFailed` (00) and `bluetoothInternalControllerInfo` (14 zero bytes) to NVRAM Add and NVRAM Delete fixed it.
-- On Sequoia the official AirportItlwm 2.3.0 Sonoma 14.4 build fails vtable patching; a newer third-party build works.
-- NullMoth specifics: SIP `0x0A43`, AMFIPass, `Kernel > Block` for `com.apple.iokit.IONDRVSupport` in dGPU-only mode, `ResizeGpuBars` and `ResizeAppleGpuBars` set to -1.
+- Bluetooth: it appeared in System Settings but turned off a few seconds after enabling. Adding `bluetoothExternalDongleFailed` (00) and `bluetoothInternalControllerInfo` (14 zero bytes) to NVRAM Add + Delete fixed it.
+- NullMoth specifics: SIP `0x0A43`, AMFIPass, `Kernel > Block` for `com.apple.iokit.IONDRVSupport` in dGPU mode, `ResizeGpuBars` and `ResizeAppleGpuBars` set to -1.
 
-Two EFIs (Tahoe and Sequoia) and a full write-up of what changed for Alder Lake and what changed for this laptop: see my repo.
+Two EFIs (Tahoe and Sequoia) and a full write-up of what changed for Alder Lake and what changed for this laptop: see my [repo.](https://github.com/NumanLUAU/LOQ-15IAX9-Hackintosh)
 
 Big thanks to NullMoth for the driver, to laobamac for the Tahoe Wi-Fi and audio work, and to pranish-dev for the LOQ reference EFI and laptop-specific patches.
