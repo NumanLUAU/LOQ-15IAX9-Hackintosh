@@ -19,7 +19,7 @@ os.makedirs("profiles/Sequoia", exist_ok=True)
 for f in os.listdir("profiles"):
     src = os.path.join("profiles", f)
     if os.path.isfile(src) and f.endswith(".plist"):
-        dst = "profiles/Sequoia" if "hybrid-NMIntelFB" in f else "profiles/Tahoe"
+        dst = "profiles/Tahoe"
         shutil.move(src, os.path.join(dst, f))
 
 # Sequoia

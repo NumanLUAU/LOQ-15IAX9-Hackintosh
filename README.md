@@ -212,11 +212,11 @@ Setting up two displays:
 |---|---|
 | `EFI-Tahoe/` | The EFI that boots Tahoe on my machine, with the SMBIOS values in `OC/config.plist` blanked out. Fill in your own before using it |
 | `EFI-Sequoia/` | The EFI that booted Sequoia, same blanking |
-| `profiles/Tahoe/`, `profiles/Sequoia/` | Config variants (SMBIOS blanked) for each OS: the shipped quiet NVIDIA-only profile, a quiet profile with a 5 second autoboot, and a verbose debug profile with all logging on. `profiles/Sequoia/` also has `config-hybrid-NMIntelFB.plist` for the hybrid route below |
+| `profiles/Tahoe/`, `profiles/Sequoia/` | Config variants (SMBIOS blanked) for each OS: the shipped quiet NVIDIA-only profile, a quiet profile with a 5 second autoboot, and a verbose debug profile with all logging on. |
 | `acpi_src/`, `acpi_out/`, `source/` | ASL sources of the custom SSDTs and the compiled AML |
-| `tools/` | iasl and the helper scripts I used (`macos/` has the NMIntelFB build and install scripts). `sync_private.py` mirrors each public EFI into my private copy and puts my real SMBIOS into its config |
+| `tools/` | iasl and the helper scripts I used. `sync_private.py` mirrors each public EFI into my private copy and puts my real SMBIOS into its config |
 | `refs/` | The reference projects I read while building this |
-| `docs/` | ACPI analysis, graphics analysis, troubleshooting, hybrid mode with NMIntelFB, a write-up for forum posts |
+| `docs/` | ACPI analysis, graphics analysis, troubleshooting, a write-up for forum posts |
 | `experimental/` | Earlier generated profiles and the one-off scripts used to produce the Tahoe and Sequoia EFIs. Not the shipped configuration |
 
 Kept out of the repo (see `.gitignore`): `EFI-private-Tahoe/` and `EFI-private-Sequoia/` (copies of the public EFIs that are identical except that their `config.plist` and profiles carry my real SMBIOS; `python -I tools/sync_private.py` keeps them in sync), the two ready-to-use zips built from them, `private_smbios.json`, `diagnostics/` (my ACPI dumps and hardware inventory), `backups/` and the macOS recovery image.
@@ -329,12 +329,6 @@ pmset -g | grep -E "hibernatemode|standby|autopoweroff|SleepDisabled"
 
 To undo: `sudo pmset -a disablesleep 0 hibernatemode 3 standby 1 autopoweroff 1`. For Windows hibernation (and Fast Startup) run `powercfg /h off` in an administrator prompt.
 
-## Hybrid mode alternative: NMIntelFB (Sequoia era, not run)
-
-If I stay in Hybrid mode (no BIOS change) the internal panel is on the Intel iGPU, which macOS cannot drive. There is a route that keeps the panel on the iGPU while the NVIDIA GPU does all the rendering: NullMoth's NMIntelFB framebuffer, patched and built with nmx-intel (kitsuneislife/nmx-intel), on NullMoth driver 2.3.6 (newer releases blink on that route). I adapted a working Tiger Lake write-up for my machine. From the sources, my iGPU (8086:468B) is in NMIntelFB's accepted list and my RTX 2050 is in the 2.3.6 installer's table, but I have not run it, and it was only ever looked at for Sequoia. The guide is `docs/HYBRID-NMINTELFB.md`, the config is `profiles/Sequoia/config-hybrid-NMIntelFB.plist` (the opposite iGPU handling to the shipped profile: no iGPU hiding, no IONDRVSupport block), and the build and install helpers are in `tools/macos/`.
-
-Costs: one display only, no sleep, about 45 seconds extra per boot, and I stay on NullMoth 2.3.6. WhateverXe (Iris Xe acceleration) is the other iGPU option; I tried it with NullMoth and it hung at the HID driver stage, so it is not used here.
-
 ## Not verified yet
 
 * The Windows entry device path (computed from my partition table) and whether Windows keeps the Lenovo identity when launched through OpenCore.
@@ -344,6 +338,6 @@ Costs: one display only, no sleep, about 45 seconds extra per boot, and I stay o
 
 ## Credits and sources
 
-OpenCorePkg, Lilu, VirtualSMC, AppleALC, NVMeFix, RestrictEvents, VoodooPS2 and CpuTscSync by Acidanthera. VoodooI2C by the VoodooI2C team. NullMoth NVIDIA driver and 1401 by NullMoth Systems. AirportItlwm and IntelBluetoothFirmware by OpenIntelWireless; the Tahoe AirportItlwm build and SimpleHDA by laobamac. iBridged by Carnations-Botanica. HoRNDIS by Joshua Wise. AMFIPass by Dortania/Acidanthera. GenSMBIOS by CorpNewt. Icons: Acidanthera GoldenGate and the chris1111 Flavours-AppleSet theme. nmx-intel by kitsuneislife (NMIntelFB patches, referenced above). The forum notes from jzrodriguez98 and kgp-macPro on Intel Wi-Fi for Tahoe helped me understand why the first Wi-Fi kext failed.
+OpenCorePkg, Lilu, VirtualSMC, AppleALC, NVMeFix, RestrictEvents, VoodooPS2 and CpuTscSync by Acidanthera. VoodooI2C by the VoodooI2C team. NullMoth NVIDIA driver and 1401 by NullMoth Systems. AirportItlwm and IntelBluetoothFirmware by OpenIntelWireless; the Tahoe AirportItlwm build and SimpleHDA by laobamac. iBridged by Carnations-Botanica. HoRNDIS by Joshua Wise. AMFIPass by Dortania/Acidanthera. GenSMBIOS by CorpNewt. Icons: Acidanthera GoldenGate and the chris1111 Flavours-AppleSet theme. The forum notes from jzrodriguez98 and kgp-macPro on Intel Wi-Fi for Tahoe helped me understand why the first Wi-Fi kext failed.
 
 Special thanks to pranish-dev (https://github.com/pranish-dev/loq_hackintosh) for the laptop-specific patches this build started from and for being my main reference for the LOQ family.
