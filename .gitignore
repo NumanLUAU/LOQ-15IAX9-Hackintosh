@@ -2,7 +2,8 @@
 /*
 !/.gitignore
 !/README.md
-!/EFI/
+!/EFI-Tahoe/
+!/EFI-Sequoia/
 !/acpi_src/
 !/acpi_out/
 !/source/
@@ -13,11 +14,16 @@
 !/docs/
 
 # Private: my generated SMBIOS, and the private copy of EFI that has it filled in
-# (EFI/ and profiles/ in git have blank SMBIOS values; tools/sync_private.py builds EFI-private/)
-/EFI-private/
+# (EFI-Tahoe/, EFI-Sequoia/ and profiles/ in git have blank SMBIOS values; tools/sync_private.py builds the EFI-private-* folders)
+/EFI-private-Tahoe/
+/EFI-private-Sequoia/
+/TahoeEFIBrokenWifi
 private_smbios.json
 /diagnostics/
 /boot thing/
+/LOQ-EFI.zip
+/LOQ15IAX9-TAHOE-26-OpenCore-1.0.8-EFI.zip
+/LOQ15IAX9-SEQUOIA-15-OpenCore-1.0.8-EFI.zip
 /backups/
 
 # Misc

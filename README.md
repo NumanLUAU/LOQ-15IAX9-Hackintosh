@@ -1,8 +1,15 @@
-# Lenovo LOQ 15IAX9 (83GS) Hackintosh, macOS Sequoia 15.x, OpenCore 1.0.8
+# Lenovo LOQ 15IAX9 (83GS) Hackintosh, macOS Tahoe 26.x and Sequoia 15.x, OpenCore 1.0.8
 
-This is the OpenCore EFI I built for my Lenovo LOQ 15IAX9 (Intel Core i5-12450HX, NVIDIA GeForce RTX 2050 Laptop). macOS Sequoia runs with full Metal acceleration on the RTX 2050 through the NullMoth driver, and my plan is to have the internal panel and the HDMI port both on the NVIDIA GPU with the Intel iGPU switched off.
+This is the OpenCore EFI I built for my Lenovo LOQ 15IAX9 (Intel Core i5-12450HX, NVIDIA GeForce RTX 2050 Laptop). macOS runs with full Metal acceleration on the RTX 2050 through the NullMoth driver. The internal panel and the HDMI port are both driven by the NVIDIA GPU, and the Intel iGPU is switched off.
 
-It is based on pranish-dev/loq_hackintosh (same laptop family, RTX 4050). I did not copy it. I read it, rebuilt everything against my own machine's ACPI tables and hardware IDs, and fixed the things that broke on mine. This README lists what I changed compared with a regular OpenCore `config.plist`, in two parts: what any Alder Lake CPU needs, and what this specific laptop needs.
+There are two EFIs, one per macOS version:
+
+| Folder | macOS | Notes |
+|---|---|---|
+| `EFI-Tahoe/` | Tahoe 26.x | The one I run now. Everything works except sleep |
+| `EFI-Sequoia/` | Sequoia 15.x | The EFI I used before I updated to Tahoe, kept as it was |
+
+It is based on pranish-dev/loq_hackintosh (same laptop family, RTX 4050). I did not copy it. I read it, rebuilt everything against my own machine's ACPI tables and hardware IDs, and fixed the things that broke on mine. This README lists what I changed compared with a regular OpenCore `config.plist`, in two parts: what any Alder Lake CPU needs, and what this specific laptop needs. A separate section lists what differs between Sequoia and Tahoe.
 
 Everything below was measured on my machine. The hardware inventory and the original ACPI tables are in my local `diagnostics/` folder, which is not part of the repo.
 
@@ -25,22 +32,24 @@ Everything below was measured on my machine. The hardware inventory and the orig
 
 ## What works on my machine
 
-| Feature | Status |
-|---|---|
-| Boot to macOS through OpenCore (from USB) | Works |
-| NVIDIA Metal acceleration (driven by NullMoth) | Works |
-| Internal panel on the NVIDIA GPU | Works in BIOS dGPU-only mode (this laptop has a MUX switch). In Hybrid mode the internal panel is not recognized and only shows the firmware framebuffer |
-| Brightness control | Works (`nvrmacpibl=1`) |
-| HDMI external display on the NVIDIA GPU | Works (tested in Hybrid mode) |
-| Internal panel and HDMI together on the NVIDIA GPU (dual display) | Works in BIOS dGPU-only mode, both displays register on the NVIDIA GPU |
-| Keyboard, mouse, USB ports, Thunderbolt/USB-C | Works |
-| Audio output and microphone | Works |
-| Wi-Fi (native, no HeliPort) | Works |
-| Touchpad | Works (needed a VoodooI2C match fix, see below) |
-| Android USB tethering (HoRNDIS) | Works |
-| Bluetooth | Works (needed the two NVRAM keys, see below). AirPlay works |
-| Sleep and hibernation | Not supported with the NullMoth driver (black screen on wake). See "Sleep and hibernation" below to switch them off |
-| Intel iGPU | Disabled on purpose |
+| Feature | Tahoe 26.x | Sequoia 15.x |
+|---|---|---|
+| Boot to macOS through OpenCore | Works | Works |
+| NVIDIA Metal acceleration (NullMoth) | Works | Works |
+| Internal panel on the NVIDIA GPU | Works in BIOS dGPU-only mode (this laptop has a MUX switch). In Hybrid mode the panel is not recognized | Same |
+| Internal panel and HDMI together (dual display) | Works in dGPU-only mode, both register on the NVIDIA GPU | Same |
+| Brightness control | Works (`nvrmacpibl=1`) | Works |
+| Keyboard, mouse, USB ports, Thunderbolt/USB-C | Works | Works |
+| Audio output and microphone | Works (needs SimpleHDA, see below) | Works (AppleALC alone) |
+| Wi-Fi (native menu, no HeliPort) | Works (laobamac Tahoe build) | Works (pranish-dev 2.4.0 build) |
+| Bluetooth | Works (`-ibtcompatbeta` and two NVRAM keys) | Works (two NVRAM keys) |
+| Touchpad | Works (VoodooI2C match fix) | Works |
+| Android USB tethering (HoRNDIS) | Works | Works |
+| macOS updates (OTA) | iBridged included | Not needed |
+| Sleep and hibernation | Not supported by the NullMoth driver, switch them off | Same |
+| Intel iGPU | Disabled on purpose | Disabled on purpose |
+
+The Sequoia column is how it behaved before I updated to Tahoe. I have not re-tested Sequoia since.
 
 ## BIOS settings (F2)
 
@@ -54,11 +63,11 @@ Everything below was measured on my machine. The hardware inventory and the orig
 | VT-d | Disabled or enabled | `DisableIoMapper` covers either |
 | Storage mode | AHCI / NVMe, never RST, VMD or RAID | |
 
-Windows Fast Startup was on when I inspected the machine. It is fine, but turn it off if the Windows partition ever looks inconsistent after dual booting.
+Windows Fast Startup was on when I inspected the machine. It is fine, but turn it off if the Windows partition ever looks inconsistent after dual booting. Do a full shutdown (not a restart) when going from Windows to macOS: the Wi-Fi/Bluetooth module is shared and Windows can leave it in a state macOS cannot use.
 
 ## Part 1: what I changed from a regular config.plist to run an Alder Lake CPU
 
-Apple never shipped macOS on Alder Lake or on hybrid P/E-core CPUs. These are the changes that make the kernel boot.
+Apple never shipped macOS on Alder Lake or on hybrid P/E-core CPUs. These are the changes that make the kernel boot. They are the same in both EFIs.
 
 | Section | Key | Value | Why |
 |---|---|---|---|
@@ -78,7 +87,7 @@ Apple never shipped macOS on Alder Lake or on hybrid P/E-core CPUs. These are th
 | Kexts | CpuTscSync | enabled | Keeps the TSC synchronised across the hybrid cores |
 | Kexts | RestrictEvents | enabled, revcpu=1, revcpuname set, revpatch=cpuname | About This Mac shows the real name "12th Gen Intel Core i5-12450HX" instead of the spoofed Comet Lake |
 | Misc > Security | SecureBootModel | Disabled | Required for the NullMoth driver |
-| PlatformInfo | SystemProductName | MacBookPro16,2 | Laptop model supported by Sequoia (battery, lid, backlight behaviour) with no AMD dGPU switching logic |
+| PlatformInfo | SystemProductName | MacBookPro16,2 | Laptop model supported by Sequoia and Tahoe (battery, lid, backlight behaviour) with no AMD dGPU switching logic |
 
 Two things that are easy to get wrong on this CPU family:
 * Hyper-Threading must stay off. The BIOS setting is the fix. I found no OpenCore setting that replaces it.
@@ -100,23 +109,28 @@ Two things that are easy to get wrong on this CPU family:
 
 All tables are gated on `_OSI("Darwin")` and the renames forward to the originals, so Windows sees stock behaviour. I do not use a replacement DSDT and I did not copy any AML from the reference EFI.
 
-### Kexts (unmodified releases unless noted)
+### Kexts
+
+Most kexts are the same in both EFIs. The rows marked Tahoe or Sequoia differ.
 
 | Kext | Version | Purpose on this laptop |
 |---|---|---|
 | Lilu | 1.7.2 | Patch engine |
 | VirtualSMC, SMCBatteryManager | 1.3.8 | SMC and battery (EC0 fields, BAT1) |
 | AppleALC | 1.9.8 | ALC257, layout-id 99 injected on `Pci(0x1f,0x3)` |
+| SimpleHDA (Tahoe only) | 1.0.0 | laobamac's Lilu plugin that restores AppleHDA on Tahoe (Apple removed it). Must load after AppleALC and needs `keepsyms=1`. I tried to use VoodooHDA first, but it has to be built and installed on the Mac itself and sounds worse, so I went with SimpleHDA. The optional `SimpleHDA-HAL` package is not needed for me |
 | NVMeFix | 1.1.3 | NVMe power management |
-| RestrictEvents | 1.1.6 | CPU name |
+| RestrictEvents | 1.1.6 | CPU name (`revcpu`, `revcpuname`, `revpatch=cpuname`). Tahoe uses the RELEASE build and also `revpatch=sbvmm` |
+| iBridged (Tahoe only) | 1.0.1 (RELEASE) | Lilu plugin by Carnations-Botanica that fixes macOS OTA updates (patches BridgeOSInstall). Needed for updating to Tahoe |
 | CpuTscSync | 1.1.2 | TSC sync |
 | BrightnessKeys | 1.0.3 | Fn brightness keys |
 | VoodooPS2Controller (keyboard plugin only) | 2.3.7 | PS/2 keyboard. I removed the Mouse and Trackpad plugins (no PS/2 pointing device) |
 | VoodooI2C + VoodooI2CHID | 2.9.1 | I2C touchpad. **Modified Info.plist only:** official 2.9.1 does not match the Alder Lake-S I2C controller 8086:7ACC, so I added `0x7acc8086&0xFFFCFFFF` to the `VoodooI2CPCILakeController` match list. The binary is untouched. It runs in polling mode (`-vi2c-force-polling` and `force-polling` on `Pci(0x15,0x0)`) because GPIO/APIC interrupts do not work |
 | RealtekRTL8111 | 3.0.0 | RTL8168 ethernet |
-| AirportItlwm | 2.4.0 | Native Wi-Fi for the AX203. **Third-party build** taken from the pranish-dev/loq_hackintosh EFI: the official 2.3.0 Sonoma 14.4 build fails vtable patching on Sequoia (seen in the OpenCore log) |
-| IntelBluetoothFirmware, IntelBTPatcher | 2.5.0 | Intel BT 8087:0026. **Third-party builds** from the pranish-dev/loq_hackintosh EFI (newer than the official 2.4.0 release, which did not work for me). Bluetooth is still not confirmed |
-| BlueToolFixup | 2.7.3 | Monterey and later Intel Bluetooth (reference EFI build, newer than the official 2.7.2) |
+| AirportItlwm (Tahoe) | 2.4.0 alpha | Native Wi-Fi for the AX203. **Third-party build** from laobamac/itlwm (v2.4.0-alpha, Tahoe RELEASE, commit 7204c69), no root patches needed, limited to Darwin 25.x. Before this I tried AirportItlwm-Tahoe 1.0.0 by kgp-macPro: it needs OCLP-CustoMac root patches and my Wi-Fi was broken with it. Fallback if native Wi-Fi ever breaks: official `itlwm.kext` 2.3.0 plus the HeliPort app |
+| AirportItlwm (Sequoia) | 2.4.0 | **Third-party build** from the pranish-dev/loq_hackintosh EFI. The official 2.3.0 Sonoma 14.4 build fails vtable patching on Sequoia (seen in the OpenCore log). Limited to Darwin 24.x |
+| IntelBluetoothFirmware, IntelBTPatcher | 2.5.0 | Intel BT 8087:0026. **Third-party builds** from the pranish-dev/loq_hackintosh EFI (newer than the official 2.4.0 release, which did not work for me) |
+| BlueToolFixup | 2.7.3 | Monterey and later Intel Bluetooth (reference EFI build, newer than the official 2.7.2). On Tahoe the boot argument `-ibtcompatbeta` is also needed |
 | HoRNDIS | 9.2 | Android USB tethering (last official release, unmaintained) |
 | AMFIPass | 1.4.1 | Lets WindowServer load the NullMoth bundle |
 | USBToolBox + UTBMap | | USB map generated by the 1401 Mac app for this laptop (see USB) |
@@ -127,9 +141,9 @@ Not included on purpose: WhateverGreen and WhateverXe (the iGPU is disabled), SM
 
 The DSDT declares 14 high-speed and 10 super-speed ports, which is more than macOS's 15-port limit. The 1401 Mac app generated a USB map (`UTBMap.kext`, with `USBToolBox.kext`) from the running system. It contains HS02 (USB-C), HS03 and HS04 (external ports), HS09, HS08 (internal ITE controller) and HS14 (internal Bluetooth, connector type 255). The built-in camera is on Windows port 6 and is not in this map. Add it if you need the camera. This map belongs to my machine, so make your own.
 
-### NVIDIA (NullMoth 2.6.6) specifics
+### NVIDIA (NullMoth) specifics
 
-NullMoth installs into `/Library/Extensions` and the auxiliary kernel collection after macOS is installed. It does not go in `EFI/OC/Kexts`. OpenCore only sets the following:
+NullMoth installs into `/Library/Extensions` and the auxiliary kernel collection after macOS is installed (the 1401 Mac app does it and updates it). It does not go in `EFI/OC/Kexts`. OpenCore only sets the following:
 
 | Where | Value | Why |
 |---|---|---|
@@ -157,6 +171,25 @@ The RTX 2050 (25ED) is in NullMoth's device table, but their validation list doe
 | DeviceProperties | `Pci(0x1f,0x3)` layout-id 99; `Pci(0x15,0x0)` force-polling | Audio and touchpad |
 | NVRAM | `bluetoothExternalDongleFailed` = 00 and `bluetoothInternalControllerInfo` = 14 zero bytes, both also in NVRAM > Delete | For Intel Bluetooth on Monterey and later: without them macOS remembers a failed controller and switches Bluetooth off a few seconds after it is enabled. Rewritten at every boot. Same keys the pranish-dev EFI uses. This fixed my Bluetooth |
 
+## Sequoia versus Tahoe: what differs
+
+Changes I made when I moved from Sequoia to Tahoe:
+
+| Item | Sequoia EFI | Tahoe EFI |
+|---|---|---|
+| Wi-Fi kext | AirportItlwm 2.4.0 (pranish-dev build), Darwin 24.x only | AirportItlwm 2.4.0 alpha (laobamac Tahoe build), Darwin 25.x only |
+| Audio | AppleALC only (macOS still has AppleHDA) | AppleALC then SimpleHDA 1.0.0 (Tahoe has no AppleHDA), plus `keepsyms=1` |
+| Bluetooth | NVRAM keys | NVRAM keys plus boot argument `-ibtcompatbeta` |
+| OTA updates | not needed | iBridged 1.0.1 |
+| RestrictEvents | 1.1.6 | 1.1.6 RELEASE, plus `revpatch=sbvmm` in boot-args |
+| boot-args extras | none | `-ibtcompatbeta`, `revpatch=sbvmm`, `keepsyms=1` |
+
+Everything else (ACPI, Alder Lake settings, NullMoth arguments, USB map, picker) is identical.
+
+Two Tahoe lessons that cost me time:
+* The Wi-Fi kext matters. Tahoe has no usable legacy Wi-Fi stack for Intel cards, and the AirportItlwm-Tahoe 1.0.0 build I tried first needs OCLP-CustoMac root patches. The laobamac Tahoe build works without root patches. Keep the Sequoia kext restricted to Darwin 24.x and the Tahoe kext to Darwin 25.x if both systems share one config.
+* Tahoe removed AppleHDA. Without SimpleHDA there is no audio even with AppleALC.
+
 ## Both displays on the NVIDIA GPU, iGPU disabled
 
 How it works:
@@ -164,7 +197,7 @@ How it works:
 2. As a second layer, `config.plist` sets `class-code = FFFFFFFF` on the iGPU's PCI path so macOS ignores it even if it shows up. In dGPU-only mode this does nothing.
 3. There is no boot argument that disables an Intel iGPU without WhateverGreen (`-wegnoigpu`). I left WhateverGreen out on purpose. If you add it, NullMoth requires `gfxrst=4`.
 
-Warning: if the BIOS is left in Hybrid mode with this config, the internal panel is wired to the iGPU, which is now hidden and has no driver. You get kernel text and then a dead internal screen while HDMI keeps working. I checked from Windows that my BIOS was still in Hybrid at one point, which is exactly why dual display looked broken.
+Warning: if the BIOS is left in Hybrid mode with this config, the internal panel is wired to the iGPU, which is now hidden and has no driver. You get kernel text and then a dead internal screen while HDMI keeps working.
 
 Setting up two displays:
 1. Boot macOS with the HDMI monitor connected (hot-plugging can leave it black).
@@ -173,42 +206,52 @@ Setting up two displays:
 4. Check with `system_profiler SPDisplaysDataType`: one GPU, two displays, Metal supported.
 5. If the second display stays black, replug it, reboot with it connected, and check `kmutil showloaded --list-only | grep -i nullmoth` (should list 4 modules) and the log from the 1401 app.
 
-## Repository layout
+## Repository layout and zips
 
 | Path | Contents |
 |---|---|
-| `EFI/` | The working EFI that boots on my machine, with the SMBIOS values in `EFI/OC/config.plist` blanked out. Fill in your own before using it |
-| `profiles/` | Config variants (SMBIOS blanked): the shipped quiet NVIDIA-only profile, a quiet profile with a 5 second autoboot, and a verbose debug profile with all logging on |
+| `EFI-Tahoe/` | The EFI that boots Tahoe on my machine, with the SMBIOS values in `OC/config.plist` blanked out. Fill in your own before using it |
+| `EFI-Sequoia/` | The EFI that booted Sequoia, same blanking |
+| `profiles/Tahoe/`, `profiles/Sequoia/` | Config variants (SMBIOS blanked) for each OS: the shipped quiet NVIDIA-only profile, a quiet profile with a 5 second autoboot, and a verbose debug profile with all logging on. `profiles/Sequoia/` also has `config-hybrid-NMIntelFB.plist` for the hybrid route below |
 | `acpi_src/`, `acpi_out/`, `source/` | ASL sources of the custom SSDTs and the compiled AML |
-| `tools/` | iasl and the helper scripts I used (`macos/` has the NMIntelFB build and install scripts). `sync_private.py` mirrors `EFI/` into my private copy and puts my real SMBIOS into its config |
+| `tools/` | iasl and the helper scripts I used (`macos/` has the NMIntelFB build and install scripts). `sync_private.py` mirrors each public EFI into my private copy and puts my real SMBIOS into its config |
 | `refs/` | The reference projects I read while building this |
-| `docs/` | ACPI analysis, graphics analysis, troubleshooting, hybrid mode with NMIntelFB |
-| `experimental/` | Earlier generated profiles (install, iGPU, WhateverXe) and the builder script. Not the shipped configuration |
+| `docs/` | ACPI analysis, graphics analysis, troubleshooting, hybrid mode with NMIntelFB, a write-up for forum posts |
+| `experimental/` | Earlier generated profiles and the one-off scripts used to produce the Tahoe and Sequoia EFIs. Not the shipped configuration |
 
-Kept out of the repo (see `.gitignore`): `EFI-private/` (a copy of `EFI/` that is identical except that its `config.plist` and profiles carry my real SMBIOS; `python -I tools/sync_private.py` keeps it in sync), `private_smbios.json`, `diagnostics/` (my ACPI dumps and hardware inventory), `backups/` and the macOS recovery image.
+Kept out of the repo (see `.gitignore`): `EFI-private-Tahoe/` and `EFI-private-Sequoia/` (copies of the public EFIs that are identical except that their `config.plist` and profiles carry my real SMBIOS; `python -I tools/sync_private.py` keeps them in sync), the two ready-to-use zips built from them, `private_smbios.json`, `diagnostics/` (my ACPI dumps and hardware inventory), `backups/` and the macOS recovery image.
+
+My two zips (not in the repo because they contain my SMBIOS):
+* `LOQ15IAX9-TAHOE-26-OpenCore-1.0.8-EFI.zip` for macOS Tahoe
+* `LOQ15IAX9-SEQUOIA-15-OpenCore-1.0.8-EFI.zip` for macOS Sequoia
+
+Each has `EFI/` (copy it to the root of the USB stick, or `EFI/OC` onto the Windows ESP) and `profiles/`.
 
 ## Installing
 
-1. Format a USB stick as GPT with one FAT32 partition (Basic data type) and copy `EFI/` to its root. First put your own generated SMBIOS values into `EFI/OC/config.plist` (see the SMBIOS section). For a fresh install, also put Apple's `com.apple.recovery.boot` folder (BaseSystem.dmg and BaseSystem.chunklist, made with OpenCore's `macrecovery.py -b Mac-7BA5B2D9E42DDD94 -m 00000000000000000 download`) on the root. Do not delete anything on your internal disks.
+1. Format a USB stick as GPT with one FAT32 partition (Basic data type) and copy the `EFI` folder for your macOS version to its root. First put your own generated SMBIOS values into `EFI/OC/config.plist` (see the SMBIOS section). For a fresh install, also put Apple's `com.apple.recovery.boot` folder (BaseSystem.dmg and BaseSystem.chunklist, made with OpenCore's `macrecovery.py -b Mac-7BA5B2D9E42DDD94 -m 00000000000000000 download`) on the root. Do not delete anything on your internal disks.
 2. Set the BIOS as above. Plug in Ethernet (Recovery uses the Realtek driver).
 3. F12, choose the stick, choose the Recovery image in OpenCore (it takes about 70 seconds to load the 884 MB image from a slow stick).
-4. Disk Utility, Show All Devices: erase only the macOS volume as APFS (never the Windows disk, never the data volume). Reinstall macOS Sequoia onto it.
-5. After install: install NullMoth (the `nullmoth-nvidia-2.6.6.tar.gz` installer or the 1401 Mac app), allow the extension in Privacy and Security, reboot twice.
+4. Disk Utility, Show All Devices: erase only the macOS volume as APFS (never the Windows disk, never the data volume). Reinstall macOS onto it.
+5. After install: install NullMoth (the 1401 Mac app or the `nullmoth-nvidia` tarball installer), allow the extension in Privacy and Security, reboot twice.
 6. Rename the macOS volume to MacOS if you like, so the picker label matches: `diskutil rename "MACOSTARGET" "MacOS"`.
+
+To update from Sequoia to Tahoe I switched the EFI to the Tahoe one first (iBridged is what lets the OTA update work), updated macOS, then fixed Wi-Fi and audio as described above.
 
 ## Mount, copy and unmount the Windows ESP from Windows (administrator PowerShell)
 
-Run this from the folder that holds your finished EFI (the SMBIOS in its `config.plist` filled in). I run it from my private copy.
+Run this from the folder that holds your finished EFI (the SMBIOS in its `config.plist` filled in). I run it from my private copy. Replace `Tahoe` with `Sequoia` for the other OS.
 
 ```powershell
 mountvol S: /S                                   # mounts the EFI System Partition of the boot disk as S:
 Get-PSDrive S                                    # check free space (needs about 40 MB)
-Get-ChildItem S:\EFI                              # expect Microsoft
-Copy-Item -Recurse .\EFI\OC S:\EFI\OC
-Get-ChildItem S:\EFI\OC
+Get-ChildItem S:\EFI                             # expect Microsoft
+if (Test-Path S:\EFI\OC) { Copy-Item -Recurse S:\EFI\OC "D:\ESP-OC-backup-$(Get-Date -Format yyyyMMdd-HHmm)"; Remove-Item -Recurse -Force S:\EFI\OC }
+Copy-Item -Recurse .\EFI-private-Tahoe\OC S:\EFI\OC
+Get-Item S:\EFI\OC\config.plist, S:\EFI\OC\OpenCore.efi
 mountvol S: /D                                   # unmount
 ```
-If `S:\EFI\OC` already exists, delete that one folder first. Never touch `S:\EFI\Microsoft`.
+Never touch `S:\EFI\Microsoft`.
 
 ## Make OpenCore the main EFI (boot without the USB stick)
 
@@ -249,7 +292,7 @@ The shipped config is already quiet (no `-v`, no OpenCore log, no panic file). F
 | Autoboot after N seconds | `Misc > Boot > Timeout` = N (0 waits forever). The picker is visible during the countdown; any key press stops it |
 | Boot the default with no picker at all | `Misc > Boot > ShowPicker` = false and `TakeoffDelay` = 10000. Then hold Escape (or the 0 key) right after the Lenovo logo to bring the picker up. These keys come from the OpenCore documentation and I have not tested them on this keyboard |
 | No verbose boot | Remove `-v` from `NVRAM > Add > 7C436110-AB2A-4BBB-A880-FE41995C9F82 > boot-args` |
-| No kernel debug output | Remove `keepsyms=1 debug=0x100 msgbuf=1048576` from boot-args. Note: `debug=0x100` stops the machine rebooting on a panic, so remove it only when things are stable |
+| No kernel debug output | Remove `debug=0x100 msgbuf=1048576` from boot-args (keep `keepsyms=1` on Tahoe, SimpleHDA needs it). Note: `debug=0x100` stops the machine rebooting on a panic, so remove it only when things are stable |
 | No OpenCore on-screen log | `Misc > Debug > Target` = 0 (0x41 keeps file logging only; 0x43 adds on-screen) |
 | No OpenCore log files at all | `Target` = 0, `AppleDebug` = false, `SysReport` = false |
 | Faster picker | Swap `OpenCore.efi` and the drivers for the RELEASE build of the same version (1.0.8) |
@@ -286,9 +329,9 @@ pmset -g | grep -E "hibernatemode|standby|autopoweroff|SleepDisabled"
 
 To undo: `sudo pmset -a disablesleep 0 hibernatemode 3 standby 1 autopoweroff 1`. For Windows hibernation (and Fast Startup) run `powercfg /h off` in an administrator prompt.
 
-## Hybrid mode alternative: NMIntelFB (not run yet)
+## Hybrid mode alternative: NMIntelFB (Sequoia era, not run)
 
-If I stay in Hybrid mode (no BIOS change) the internal panel is on the Intel iGPU, which macOS cannot drive. There is a route that keeps the panel on the iGPU while the NVIDIA GPU does all the rendering: NullMoth's NMIntelFB framebuffer, patched and built with nmx-intel (kitsuneislife/nmx-intel), on NullMoth driver 2.3.6 (newer releases blink on that route). I adapted a working Tiger Lake write-up for my machine. From the sources, my iGPU (8086:468B) is in NMIntelFB's accepted list and my RTX 2050 is in the 2.3.6 installer's table, but I have not run it. The guide is `docs/HYBRID-NMINTELFB.md`, the config is `profiles/config-hybrid-NMIntelFB.plist` (the opposite iGPU handling to the shipped profile: no iGPU hiding, no IONDRVSupport block), and the build and install helpers are in `tools/macos/`.
+If I stay in Hybrid mode (no BIOS change) the internal panel is on the Intel iGPU, which macOS cannot drive. There is a route that keeps the panel on the iGPU while the NVIDIA GPU does all the rendering: NullMoth's NMIntelFB framebuffer, patched and built with nmx-intel (kitsuneislife/nmx-intel), on NullMoth driver 2.3.6 (newer releases blink on that route). I adapted a working Tiger Lake write-up for my machine. From the sources, my iGPU (8086:468B) is in NMIntelFB's accepted list and my RTX 2050 is in the 2.3.6 installer's table, but I have not run it, and it was only ever looked at for Sequoia. The guide is `docs/HYBRID-NMINTELFB.md`, the config is `profiles/Sequoia/config-hybrid-NMIntelFB.plist` (the opposite iGPU handling to the shipped profile: no iGPU hiding, no IONDRVSupport block), and the build and install helpers are in `tools/macos/`.
 
 Costs: one display only, no sleep, about 45 seconds extra per boot, and I stay on NullMoth 2.3.6. WhateverXe (Iris Xe acceleration) is the other iGPU option; I tried it with NullMoth and it hung at the HID driver stage, so it is not used here.
 
@@ -296,9 +339,11 @@ Costs: one display only, no sleep, about 45 seconds extra per boot, and I stay o
 
 * The Windows entry device path (computed from my partition table) and whether Windows keeps the Lenovo identity when launched through OpenCore.
 * Sleep and hibernation (not supported by the driver).
+* The Sequoia EFI since the move to Tahoe (I have not booted it again).
+* Wi-Fi on Tahoe uses an alpha build; I will watch for regressions after NullMoth or macOS updates.
 
 ## Credits and sources
 
-OpenCorePkg, Lilu, VirtualSMC, AppleALC, NVMeFix, RestrictEvents, VoodooPS2 and CpuTscSync by Acidanthera. VoodooI2C by the VoodooI2C team. NullMoth NVIDIA driver and 1401 by NullMoth Systems. AirportItlwm and IntelBluetoothFirmware by OpenIntelWireless. HoRNDIS by Joshua Wise. AMFIPass by Dortania/Acidanthera. GenSMBIOS by CorpNewt. Icons: Acidanthera GoldenGate and the chris1111 Flavours-AppleSet theme. nmx-intel by kitsuneislife (NMIntelFB patches, referenced above).
+OpenCorePkg, Lilu, VirtualSMC, AppleALC, NVMeFix, RestrictEvents, VoodooPS2 and CpuTscSync by Acidanthera. VoodooI2C by the VoodooI2C team. NullMoth NVIDIA driver and 1401 by NullMoth Systems. AirportItlwm and IntelBluetoothFirmware by OpenIntelWireless; the Tahoe AirportItlwm build and SimpleHDA by laobamac. iBridged by Carnations-Botanica. HoRNDIS by Joshua Wise. AMFIPass by Dortania/Acidanthera. GenSMBIOS by CorpNewt. Icons: Acidanthera GoldenGate and the chris1111 Flavours-AppleSet theme. nmx-intel by kitsuneislife (NMIntelFB patches, referenced above). The forum notes from jzrodriguez98 and kgp-macPro on Intel Wi-Fi for Tahoe helped me understand why the first Wi-Fi kext failed.
 
 Special thanks to pranish-dev (https://github.com/pranish-dev/loq_hackintosh) for the laptop-specific patches this build started from and for being my main reference for the LOQ family.

@@ -19,7 +19,7 @@ Not verified: it has only been run on a Tiger Lake iGPU (9A49) and, upstream, on
 |---|---|---|
 | iGPU | 8086:9A49 | 8086:468B |
 | dGPU | RTX 3060 (10DE:2520) | RTX 2050 Laptop (10DE:25ED, GA107) |
-| OpenCore config | WhateverGreen on, nothing on the iGPU | No WhateverGreen. `profiles/config-hybrid-NMIntelFB.plist` leaves the iGPU alone |
+| OpenCore config | WhateverGreen on, nothing on the iGPU | No WhateverGreen. `profiles/Sequoia/config-hybrid-NMIntelFB.plist` leaves the iGPU alone |
 | What must NOT be in the config | iGPU DeviceProperties, IONDRVSupport block | My dGPU-only profile has both (`class-code` hide on `Pci(0x2,0x0)` and the IONDRVSupport block). The hybrid profile removes them |
 | NullMoth version | 2.3.6 | I am on 2.6.6, so I have to go back to 2.3.6 (newer versions make the panel blink with this route) |
 | Extra boot-args | `-igfxvesa gfxrst=4` (WhateverGreen) | Not needed, no WhateverGreen. I also dropped `nvfbhidpi` and `nvrmacpibl` (added by the 2.6.x app, not for this route) |
@@ -27,7 +27,7 @@ Not verified: it has only been run on a Tiger Lake iGPU (9A49) and, upstream, on
 ## Steps
 
 1. **Remove NullMoth 2.6.6** while I am still on the working dGPU-only setup: 1401 app, Remove the driver (or the picker entry "1401: Remove NVIDIA driver"). Keep a copy of the current USB config.
-2. **Switch the stick to the hybrid profile** (from Windows): copy `EFI-private\profiles\config-hybrid-NMIntelFB.plist` over `EFI\OC\config.plist` on the stick, keeping the old file as a backup. Leave the BIOS in Hybrid. Put these on the stick too: `dl\NullMoth-2.3.6\1401-Mac-2.3.6.dmg` (checksum verified against the release) and the two scripts in `tools\macos\`.
+2. **Switch the stick to the hybrid profile** (from Windows): copy `EFI-private-Sequoia\profiles\config-hybrid-NMIntelFB.plist` over `EFI\OC\config.plist` on the stick, keeping the old file as a backup. Leave the BIOS in Hybrid. Put these on the stick too: `dl\NullMoth-2.3.6\1401-Mac-2.3.6.dmg` (checksum verified against the release) and the two scripts in `tools\macos\`.
 3. **Install NullMoth 2.3.6** in macOS: open `1401-Mac-2.3.6.dmg`, replace `/Applications/1401.app`, confirm the version (`plutil -p /Applications/1401.app/Contents/Info.plist | grep ShortVersion` says 2.3.6), run its four steps. Read the log before rebooting: it must say `the built-in screen runs on the Intel GPU through the firmware framebuffer; IONDRVSupport stays on`. If it says it blocks IONDRVSupport, do not reboot; disable that `Kernel > Block` entry first. Never press "Check for a newer driver" afterwards.
 4. **Verify the RTX is a headless Metal device** after the reboot (the screen still looks unaccelerated, that is expected):
 ```bash
