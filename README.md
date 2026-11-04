@@ -6,7 +6,7 @@ There are two EFIs, one per macOS version:
 
 | Folder | macOS | Notes |
 |---|---|---|
-| `EFI-Tahoe/` | Tahoe 26.x | The one I run now. Everything works except sleep |
+| `EFI-Tahoe/` | Tahoe 26.x | The one I run now. Everything works except deep sleep (S3) and hibernation |
 | `EFI-Sequoia/` | Sequoia 15.x | The EFI I used before I updated to Tahoe, kept as it was |
 
 It is based on pranish-dev/loq_hackintosh (same laptop family, RTX 4050). I did not copy it. I read it, rebuilt everything against my own machine's ACPI tables and hardware IDs, and fixed the things that broke on mine. This README lists what I changed compared with a regular OpenCore `config.plist`, in two parts: what any Alder Lake CPU needs, and what this specific laptop needs. A separate section lists what differs between Sequoia and Tahoe.
@@ -46,7 +46,8 @@ Everything below was measured on my machine. The hardware inventory and the orig
 | Touchpad | Works (VoodooI2C match fix) | Works |
 | Android USB tethering (HoRNDIS) | Works | Works |
 | macOS updates (OTA) | iBridged included | Not needed |
-| Sleep and hibernation | Not supported by the NullMoth driver, switch them off | Same |
+| Sleep | Works | Not re-tested on Sequoia |
+| Deep sleep (S3) and hibernation | Do not work, switched off with `pmset` (see below) | Same |
 | Intel iGPU | Disabled on purpose | Disabled on purpose |
 
 The Sequoia column is how it behaved before I updated to Tahoe. I have not re-tested Sequoia since.
@@ -118,7 +119,7 @@ Most kexts are the same in both EFIs. The rows marked Tahoe or Sequoia differ.
 | Lilu | 1.7.2 | Patch engine |
 | VirtualSMC, SMCBatteryManager | 1.3.8 | SMC and battery (EC0 fields, BAT1) |
 | AppleALC | 1.9.8 | ALC257, layout-id 99 injected on `Pci(0x1f,0x3)` |
-| SimpleHDA (Tahoe only) | 1.0.0 | laobamac's Lilu plugin that restores AppleHDA on Tahoe (Apple removed it). Must load after AppleALC and needs `keepsyms=1`. I tried to use VoodooHDA first, but it has to be built and installed on the Mac itself and sounds worse, so I went with SimpleHDA. The optional `SimpleHDA-HAL` package is not needed for me |
+| SimpleHDA (Tahoe only) | 1.0.0 | laobamac's Lilu plugin that restores AppleHDA on Tahoe (Apple removed it). Must load after AppleALC and needs `keepsyms=1`. I tried to use VoodooHDA first, but it has to be built and installed on the Mac itself and sounds worse, so I went with SimpleHDA. The optional `SimpleHDA-HAL` package is not needed for me. Note: NullMoth 2.7 added its own HD Audio driver for Tahoe (its installer sets it up when it finds an HD Audio controller). I installed SimpleHDA before that existed and audio works for me, so I have not switched to NullMoth's driver. If you use NullMoth's, do not load both audio stacks |
 | NVMeFix | 1.1.3 | NVMe power management |
 | RestrictEvents | 1.1.6 | CPU name (`revcpu`, `revcpuname`, `revpatch=cpuname`). Tahoe uses the RELEASE build and also `revpatch=sbvmm` |
 | iBridged (Tahoe only) | 1.0.1 (RELEASE) | Lilu plugin by Carnations-Botanica that fixes macOS OTA updates (patches BridgeOSInstall). Needed for updating to Tahoe |
@@ -141,9 +142,9 @@ Not included on purpose: WhateverGreen and WhateverXe (the iGPU is disabled), SM
 
 The DSDT declares 14 high-speed and 10 super-speed ports, which is more than macOS's 15-port limit. The 1401 Mac app generated a USB map (`UTBMap.kext`, with `USBToolBox.kext`) from the running system. It contains HS02 (USB-C), HS03 and HS04 (external ports), HS09, HS08 (internal ITE controller) and HS14 (internal Bluetooth, connector type 255). The built-in camera is on Windows port 6 and is not in this map. Add it if you need the camera. This map belongs to my machine, so make your own.
 
-### NVIDIA (NullMoth) specifics
+### NVIDIA (NullMoth 2.7.1) specifics
 
-NullMoth installs into `/Library/Extensions` and the auxiliary kernel collection after macOS is installed (the 1401 Mac app does it and updates it). It does not go in `EFI/OC/Kexts`. OpenCore only sets the following:
+I run NullMoth driver 2.7.1 on Tahoe (on Sequoia I used 2.6.6), installed and updated with the 1401 Mac app. NullMoth installs into `/Library/Extensions` and the auxiliary kernel collection after macOS is installed (the 1401 Mac app does it and updates it). It does not go in `EFI/OC/Kexts`. OpenCore only sets the following:
 
 | Where | Value | Why |
 |---|---|---|
@@ -155,7 +156,7 @@ NullMoth installs into `/Library/Extensions` and the auxiliary kernel collection
 | Kernel > Block | `com.apple.iokit.IONDRVSupport`, Exclude | Stops Apple's firmware framebuffer from taking display index 0 |
 | Misc > Tools | NullMothSafe.efi (two entries, disabled) | The 1401 "remove driver" tools. Enable them in `config.plist` if you ever need to recover from a bad driver install |
 
-The RTX 2050 (25ED) is in NullMoth's device table, but their validation list does not include Ampere laptops, so this is a setup that works for me, not a vendor-validated one.
+The RTX 2050 (25ED) is in NullMoth's device table, but their validation list (still the case in 2.7.1) does not include Ampere laptops, so this is a setup that works for me, not a vendor-validated one.
 
 ### Other laptop-specific settings
 
@@ -315,24 +316,23 @@ Generate your own with corpnewt/GenSMBIOS for MacBookPro16,2 and put the serial,
 
 ## Sleep and hibernation
 
-The NullMoth driver cannot wake the GPU after sleep, so I switch sleep and hibernation off in macOS. OpenCore already has `Misc > Boot > HibernateMode` = None.
+On Tahoe with NullMoth 2.7.1, sleep works on my machine. S3 (deep sleep) and hibernation do not, so I switch the hibernation behaviour off. OpenCore already has `Misc > Boot > HibernateMode` = None. Older NullMoth versions (and the pranish-dev notes) could not wake the GPU after sleep and ended in a black screen; NullMoth 2.7 added system sleep and wake support, which is what I am running.
 
 ```bash
 sudo pmset -a hibernatemode 0
 sudo pmset -a standby 0
 sudo pmset -a autopoweroff 0
 sudo pmset -a powernap 0
-sudo pmset -a disablesleep 1          # no system sleep at all (closing the lid will not sleep either)
 sudo rm -f /var/vm/sleepimage         # optional, frees the RAM-sized hibernation file
 pmset -g | grep -E "hibernatemode|standby|autopoweroff|SleepDisabled"
 ```
 
-To undo: `sudo pmset -a disablesleep 0 hibernatemode 3 standby 1 autopoweroff 1`. For Windows hibernation (and Fast Startup) run `powercfg /h off` in an administrator prompt.
+If the screen ever stays black after waking, `sudo pmset -a disablesleep 1` turns system sleep off completely (closing the lid then will not sleep either; undo with `disablesleep 0`). To undo the settings above: `sudo pmset -a hibernatemode 3 standby 1 autopoweroff 1`. For Windows hibernation (and Fast Startup) run `powercfg /h off` in an administrator prompt.
 
 ## Not verified yet
 
 * The Windows entry device path (computed from my partition table) and whether Windows keeps the Lenovo identity when launched through OpenCore.
-* Sleep and hibernation (not supported by the driver).
+* Deep sleep (S3) and hibernation (do not work).
 * The Sequoia EFI since the move to Tahoe (I have not booted it again).
 * Wi-Fi on Tahoe uses an alpha build; I will watch for regressions after NullMoth or macOS updates.
 

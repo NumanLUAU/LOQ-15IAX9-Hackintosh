@@ -9,7 +9,7 @@
 
 **Software**
 - macOS Tahoe 26.x (also ran on Sequoia 15.x before I updated)
-- NullMoth driver 2.6.6 (installed and updated with the 1401 Mac app)
+- NullMoth driver 2.7.1 (installed and updated with the 1401 Mac app)
 
 **BIOS**
 - Graphics Device: dGPU only (this laptop has a MUX switch)
@@ -21,6 +21,7 @@ Full Metal acceleration on the RTX 2050. In dGPU-only mode the built-in panel (1
 **What works (Tahoe)**
 - Built-in display and HDMI display at the same time, both on the NVIDIA GPU
 - Brightness control (`nvrmacpibl=1`)
+- Sleep (on NullMoth 2.7.1)
 - Keyboard, mouse, USB, Thunderbolt/USB-C, Ethernet
 - Touchpad (Goodix I2C, needs a VoodooI2C match for the Alder Lake controller `8086:7acc`, see below)
 - Audio and microphone (ALC257, AppleALC layout 99 plus SimpleHDA)
@@ -30,11 +31,11 @@ Full Metal acceleration on the RTX 2050. In dGPU-only mode the built-in panel (1
 - macOS OTA updates (iBridged)
 
 **What does not work**
-- Sleep and hibernation (NullMoth black screen on wake). I run `pmset` with sleep and hibernation off.
+- Deep sleep (S3) and hibernation. I run `pmset` with hibernation off. Normal sleep works on NullMoth 2.7.1 (older versions gave a black screen on wake).
 - WhateverXe together with NullMoth: the boot stuck waiting for the HID driver, so I removed it.
 
 **Tahoe specific notes**
-- Audio: Tahoe has no AppleHDA. Adding laobamac's SimpleHDA 1.0.0 after AppleALC (order Lilu, AppleALC, SimpleHDA) with `keepsyms=1` brought it back. VoodooHDA on Tahoe has to be built and installed on the Mac, so I did not use it.
+- Audio: Tahoe has no AppleHDA. Adding laobamac's SimpleHDA 1.0.0 after AppleALC (order Lilu, AppleALC, SimpleHDA) with `keepsyms=1` brought it back. VoodooHDA on Tahoe has to be built and installed on the Mac, so I did not use it. NullMoth 2.7 also ships its own HD Audio driver for Tahoe; I have not switched to it.
 - Wi-Fi: AirportItlwm-Tahoe 1.0.0 (kgp-macPro) needs OCLP-CustoMac root patches and gave me no interface and no MAC address. laobamac's itlwm v2.4.0-alpha Tahoe build works with no root patches. Keep it limited to Darwin 25.x.
 - Bluetooth: on Tahoe `-ibtcompatbeta` is needed on top of IntelBluetoothFirmware, IntelBTPatcher 2.5.0 and BlueToolFixup 2.7.3.
 - Updating from Sequoia: iBridged 1.0.1 (Lilu plugin) fixes the OTA process, and RestrictEvents RELEASE 1.1.6 with `revpatch=sbvmm` was used.

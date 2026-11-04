@@ -20,14 +20,15 @@ This is how I worked out which graphics setup to use on this laptop, what I trie
 | **dGPU-only (MUX) mode, NullMoth, iGPU hidden** | **Works. The internal panel and the HDMI monitor both register on the NVIDIA GPU, with full Metal acceleration and brightness control. This is what I run on Sequoia and Tahoe** |
 | Hybrid mode, WhateverXe on the iGPU plus NullMoth for the NVIDIA GPU | Both kexts loaded with no crashes, but the internal screen went blue and the boot stuck waiting for the HID driver. I removed WhateverXe |
 
-## NullMoth (nvidia-macos-driver) vs the RTX 2050
+## NullMoth (nvidia-macos-driver 2.7.1) vs the RTX 2050
 
 1. **Device ID supported?** Yes. `25ED` is in `SUPPORTED_IDS` of the installer.
-2. **Physically validated by NullMoth?** No. Their `docs/CARD-SUPPORT.md` lists Turing, Ampere and Ada as pending, and only Blackwell cards are validated. A list entry is not validation. I have validated it myself on this one laptop: it runs, with Metal, on both Sequoia and Tahoe.
+2. **Physically validated by NullMoth?** No. Their `docs/CARD-SUPPORT.md` (checked again for 2.7.1) lists Turing, Ampere and Ada as pending, and only Blackwell cards are validated. A list entry is not validation. I have validated it myself on this one laptop: it runs, with Metal, on both Sequoia and Tahoe.
 3. **Architecture and firmware?** Ampere is covered by NVIDIA's open RM (Turing and newer) and the GSP firmware the driver ships.
 4. **MUX?** NullMoth says accepting a PCI ID does not implement an Optimus display mux. It only drives outputs that are physically wired to the NVIDIA GPU. That is why I need the BIOS MUX switch in dGPU-only mode for the internal panel.
 5. **Coexisting with WhateverXe?** Not documented upstream. I tried it (see above) and it hung, so it is not part of my setup.
-6. **Limits:** sleep and hibernation do not work (the PCIe link is cut and the GPU never comes back, so the screen stays black). I switch them off with `pmset`. Brightness needs the opt-in `nvrmacpibl=1`, which NullMoth warns hung some laptops. It works on mine.
+6. **Limits:** sleep works for me on 2.7.1, but S3 (deep sleep) and hibernation do not, so I switch hibernation off with `pmset`. Older NullMoth versions could not wake the GPU after sleep (the PCIe link is cut and the screen stays black). The 2.7 docs describe system sleep and wake support, which they tested on a desktop RTX 5050 with macOS 15.8.1. Brightness needs the opt-in `nvrmacpibl=1`, which NullMoth warns hung some laptops. It works on mine.
+   Audio on Tahoe: NullMoth 2.7 ships its own HD Audio driver for Tahoe (Apple removed AppleHDA). My EFI uses SimpleHDA instead, which works, so I have not tried NullMoth's.
 7. **Install model:** the kexts install into `/Library/Extensions` and the auxiliary kernel collection from inside macOS, not into `EFI/OC/Kexts`. OpenCore only needs SIP `0x0A43`, the NullMoth boot-args, `SecureBootModel=Disabled`, Lilu and AMFIPass, and (panel on the dGPU) the `IONDRVSupport` block.
 
 ## WhateverXe vs the iGPU
